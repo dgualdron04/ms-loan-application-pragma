@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8081
 spring:
   application:
     name: "ms-loan-application"
@@ -9,6 +9,21 @@ spring:
     console:
       enabled: true
       path: "/h2"
+logging:
+  level:
+    root: INFO # PROD - INFO
+    co.com.pragma: DEBUG # PROD - INFO/DEBUG
+    org.springframework.r2dbc: WARN
+    io.r2dbc.postgresql.QUERY: INFO # PROD - INFO O WARN
+    io.r2dbc.postgresql.PARAM: WARN # PROD - WARM O OFF
+adapters:
+  r2dbc:
+    host: localhost
+    port: 5432
+    database: crediya_loan_db
+    schema: public
+    username: crediya
+    password: crediya2025
   profiles:
     include: null
 management:
@@ -22,3 +37,7 @@ management:
         enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
+
+routes:
+  paths:
+    loans: "/api/v1/solicitud"
