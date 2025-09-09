@@ -11,19 +11,19 @@ spring:
       path: "/h2"
 logging:
   level:
-    root: INFO # PROD - INFO
-    co.com.pragma: DEBUG # PROD - INFO/DEBUG
-    org.springframework.r2dbc: WARN
-    io.r2dbc.postgresql.QUERY: INFO # PROD - INFO O WARN
-    io.r2dbc.postgresql.PARAM: WARN # PROD - WARM O OFF
+    root: "INFO"
+    co.com.pragma: "DEBUG"
+    org.springframework.r2dbc: "WARN"
+    io.r2dbc.postgresql.QUERY: "INFO"
+    io.r2dbc.postgresql.PARAM: "WARN"
 adapters:
   r2dbc:
-    host: localhost
+    host: "localhost"
     port: 5432
-    database: crediya_loan_db
-    schema: public
-    username: crediya
-    password: crediya2025
+    database: "crediya_loan_db"
+    schema: "public"
+    username: "crediya"
+    password: "crediya2025"
   profiles:
     include: null
 management:
@@ -35,9 +35,36 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
-
 routes:
   paths:
     loans: "/api/v1/solicitud"
+adapter:
+  restconsumer:
+    timeout: 3000
+    url: "http://localhost:8080"
+resilience4j:
+  circuitbreaker:
+    instances:
+      testGet:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
+      testPost:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"

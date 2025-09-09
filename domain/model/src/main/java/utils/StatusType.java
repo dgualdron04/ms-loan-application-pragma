@@ -1,5 +1,6 @@
 package utils;
 
+import exception.BusinessRuleViolatedException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -18,6 +19,6 @@ public enum StatusType {
         return Arrays.stream(values())
                 .filter(s -> s.getName().equalsIgnoreCase(name))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown status: " + name));
+                .orElseThrow(() -> new BusinessRuleViolatedException("The status does not exist: " + name));
     }
 }

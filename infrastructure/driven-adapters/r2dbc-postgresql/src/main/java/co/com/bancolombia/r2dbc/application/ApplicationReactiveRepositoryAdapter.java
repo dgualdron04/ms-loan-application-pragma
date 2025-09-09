@@ -26,4 +26,8 @@ public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperati
         return super.save(application);
     }
 
+    public Mono<Boolean> existsByIdNumberAndStatusId(Long idNumber, UUID statusId) {
+        return repository.existsByIdNumberAndStatusId(idNumber, statusId);
+    }
+
 }

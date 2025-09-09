@@ -24,6 +24,7 @@ public class ApplicationApiMapper {
     }
 
     public ApplicationResponseDTO toResponse(ApplicationView view) {
+        System.out.println(view.toString());
         return new ApplicationResponseDTO(
                 view.getEmail(),
                 view.getAmount(),
