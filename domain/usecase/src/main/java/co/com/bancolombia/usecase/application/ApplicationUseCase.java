@@ -25,14 +25,18 @@ public class ApplicationUseCase implements IApplicationUseCase {
     private final LoanTypeRepository loanTypeRepository;
     private final TransactionalGateway transactionalGateway;
     private final AuthGateway authGateway;
+    private final CustomLogger logger;
 
     public Mono<ApplicationView> save(ApplicationView application) {
 
-        Mono<UUID> statusIdMono = applicationStatusRepository.findIdByName(application.getStatus());
+        logger.info("SaveApplication.start email={} id={} loanType={} status={}", application.getEmail(), application.getIdNumber(), application.getLoanType(), application.getStatus());
+        Mono<UUID> statusIdMono = applicationStatusRepository.findIdByName(application.getStatus())
+                .doOnSubscribe(s -> logger.debug("status.lookup.start status: statusId={}", application.getStatus()));
         Mono<UUID> loanTypeIdMono = loanTypeRepository.findIdByName(application.getLoanType())
+                .doOnSubscribe(s ->logger.debug("loanType.lookup.start loanTypeId={}", application.getLoanType()))
                 .switchIfEmpty(
                         Mono.error(
-                                new BusinessRuleViolatedException("El tipo de préstamo " + application.getLoanType() + " no existe")
+                                new BusinessRuleViolatedException("The loan type " + application.getLoanType() + " does not exist.")
                         )
                 );
 
@@ -41,15 +45,18 @@ public class ApplicationUseCase implements IApplicationUseCase {
                 application.getIdNumber(),
                 statusIdMono,
                 applicationRepository
-        );
+        ).doOnSubscribe(s -> logger.debug("noDuplicatePending.check.start id={} status={}", application.getIdNumber(), application.getStatus()))
+                .doOnSuccess(v -> logger.debug("noDuplicatePending.check.ok id={}", application.getIdNumber()));;
 
         Mono<Void> validations = Mono.when(
                 requireTrue(
-                        authGateway.existsByEmail(application.getEmail()),
+                        authGateway.existsByEmail(application.getEmail())
+                                .doOnSubscribe(s -> logger.debug("auth.existsByEmail.start email={}", application.getEmail())),
                         "The email does not belong to a user."
                 ),
                 requireTrue(
-                        authGateway.existsByIdNumber(application.getIdNumber()),
+                        authGateway.existsByIdNumber(application.getIdNumber())
+                                .doOnSubscribe(s -> logger.debug("auth.existsById.start id={}", application.getIdNumber())),
                         "The document does not belong to any user."
                 ),
                 noDuplicatePending
@@ -67,6 +74,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
                                 .loanTypeId(tuple.getT2())
                                 .build()
                     )
+                    .doOnSubscribe(s -> logger.debug("repository.save.start id={}", application.getIdNumber()))
                     .flatMap(applicationRepository::save)
                     .map(saved -> ApplicationView.builder()
                             .idNumber(saved.getIdNumber())
@@ -78,7 +86,10 @@ public class ApplicationUseCase implements IApplicationUseCase {
                             .build()
                     )
                 )
-        );
+        )
+        .doOnSuccess(s -> {
+            logger.info("SaveApplication.ok email={} id={}", application.getEmail(), application.getIdNumber());
+        });
     }
 
     private Mono<Void> requireTrue(Mono<Boolean> mono, String message) {

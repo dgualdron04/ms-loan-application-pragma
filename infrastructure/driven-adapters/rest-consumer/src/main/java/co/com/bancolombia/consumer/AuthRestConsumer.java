@@ -1,6 +1,7 @@
 package co.com.bancolombia.consumer;
 
 import co.com.bancolombia.model.auth.gateway.AuthGateway;
+import gateways.CustomLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class AuthRestConsumer implements AuthGateway {
     private final WebClient client;
+    private final CustomLogger logger;
 
     public Mono<Boolean> existsByEmail(String email) {
         return client.get()
