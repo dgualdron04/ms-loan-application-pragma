@@ -28,3 +28,5 @@ include ':logger'
 project(':logger').projectDir = file('./infrastructure/helpers/logger')
 include ':rest-consumer'
 project(':rest-consumer').projectDir = file('./infrastructure/driven-adapters/rest-consumer')
+include ':identity-context'
+project(':identity-context').projectDir = file('./infrastructure/driven-adapters/identity-context')

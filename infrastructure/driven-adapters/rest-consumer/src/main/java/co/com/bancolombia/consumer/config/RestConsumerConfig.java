@@ -27,7 +27,7 @@ public class RestConsumerConfig {
         this.timeout = timeout;
     }
 
-    @Bean
+    @Bean("defaultWebClient")
     public WebClient getWebClient(WebClient.Builder builder) {
         return builder
             .baseUrl(url)

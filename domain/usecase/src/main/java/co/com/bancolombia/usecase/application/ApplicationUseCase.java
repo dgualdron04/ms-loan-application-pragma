@@ -6,6 +6,8 @@ import co.com.bancolombia.model.application.gateways.ApplicationRepository;
 import co.com.bancolombia.model.applicationstatus.ApplicationStatus;
 import co.com.bancolombia.model.applicationstatus.gateways.ApplicationStatusRepository;
 import co.com.bancolombia.model.auth.gateway.AuthGateway;
+import co.com.bancolombia.model.identity.Identity;
+import co.com.bancolombia.model.identity.gateways.IdentityRepository;
 import co.com.bancolombia.model.loantype.gateways.LoanTypeRepository;
 import co.com.bancolombia.usecase.application.validation.PendingApplicationValidator;
 import exception.BusinessRuleViolatedException;
@@ -13,6 +15,7 @@ import gateways.CustomLogger;
 import gateways.TransactionalGateway;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
+import utils.RoleTypes;
 import utils.StatusType;
 
 import java.util.UUID;
@@ -26,6 +29,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
     private final TransactionalGateway transactionalGateway;
     private final AuthGateway authGateway;
     private final CustomLogger logger;
+    private final IdentityRepository identityRepository;
 
     public Mono<ApplicationView> save(ApplicationView application) {
 
@@ -48,7 +52,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
         ).doOnSubscribe(s -> logger.debug("noDuplicatePending.check.start id={} status={}", application.getIdNumber(), application.getStatus()))
                 .doOnSuccess(v -> logger.debug("noDuplicatePending.check.ok id={}", application.getIdNumber()));;
 
-        Mono<Void> validations = Mono.when(
+        Mono<Void> authChecks = Mono.when(
                 requireTrue(
                         authGateway.existsByEmail(application.getEmail())
                                 .doOnSubscribe(s -> logger.debug("auth.existsByEmail.start email={}", application.getEmail())),
@@ -58,8 +62,27 @@ public class ApplicationUseCase implements IApplicationUseCase {
                         authGateway.existsByIdNumber(application.getIdNumber())
                                 .doOnSubscribe(s -> logger.debug("auth.existsById.start id={}", application.getIdNumber())),
                         "The document does not belong to any user."
-                ),
-                noDuplicatePending
+                )
+        );
+
+        Mono<Identity> identityMono = identityRepository.current().cache();
+
+        Mono<Void> requesterIsClient = identityMono
+                .map(id -> id.getRole() == RoleTypes.CLIENT)
+                .flatMap(ok -> ok ? Mono.empty()
+                        : Mono.error(new BusinessRuleViolatedException("Only Client users can create applications.")));
+
+        Mono<Void> ownership = identityMono
+                .map(id -> id.getEmail() != null
+                && id.getEmail().equalsIgnoreCase(application.getEmail()))
+                .flatMap(ok -> ok ? Mono.empty()
+                        : Mono.error(new BusinessRuleViolatedException("You can only create applications for yousrself.")));
+
+        Mono<Void> validations = Mono.when(
+                noDuplicatePending,
+                authChecks,
+                requesterIsClient,
+                ownership
         );
 
         return transactionalGateway.executeTransactional(

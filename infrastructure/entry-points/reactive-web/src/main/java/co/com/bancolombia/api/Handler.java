@@ -4,10 +4,12 @@ import co.com.bancolombia.api.dto.request.CreateApplicationDTO;
 import co.com.bancolombia.api.exception.model.InternalException;
 import co.com.bancolombia.api.mapper.ApplicationApiMapper;
 import co.com.bancolombia.usecase.application.IApplicationUseCase;
+import exception.BusinessRuleViolatedException;
 import exception.DomainException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -19,10 +21,13 @@ public class Handler {
     private final IApplicationUseCase applicationUseCase;
     private final ApplicationApiMapper applicationApiMapper;
 
+    @PreAuthorize("hasAuthority('CLIENT')")
     public Mono<ServerResponse> listenSaveApplication(ServerRequest serverRequest) {
+        System.out.println("hola");
         return serverRequest.bodyToMono(CreateApplicationDTO.class)
                 .map(applicationApiMapper::toDomain)
                 .flatMap(applicationUseCase::save)
+                .switchIfEmpty(Mono.error(new BusinessRuleViolatedException("APPLICATION_NOT_SAVED")))
                 .map(applicationApiMapper::toResponse)
                 .flatMap(res -> ServerResponse.status(HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)

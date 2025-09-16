@@ -68,3 +68,7 @@ resilience4j:
         slidingWindowSize: 10
         minimumNumberOfCalls: 10
         waitDurationInOpenState: "10s"
+jwt:
+  secret: "GKU2sCyjHN2D4KXdLKsxRn3UDKI1TjTdP3pxzMzfIE8="
+  expiration: 3600
+  jws-algorithms: HS256

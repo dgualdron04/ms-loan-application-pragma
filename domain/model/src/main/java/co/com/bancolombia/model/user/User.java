@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 //import lombok.NoArgsConstructor;
 import lombok.Setter;
+import utils.RoleTypes;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -21,4 +22,5 @@ public class User {
     private Long idNumber;
     private String phone;
     private Integer baseSalary;
+    private RoleTypes role;
 }
