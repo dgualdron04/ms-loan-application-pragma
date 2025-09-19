@@ -3,6 +3,8 @@ package co.com.bancolombia.api;
 import co.com.bancolombia.api.dto.request.CreateApplicationDTO;
 import co.com.bancolombia.api.exception.model.InternalException;
 import co.com.bancolombia.api.mapper.ApplicationApiMapper;
+import co.com.bancolombia.model.application.ApplicationList;
+import co.com.bancolombia.model.application.ApplicationSearchFilters;
 import co.com.bancolombia.usecase.application.IApplicationUseCase;
 import exception.BusinessRuleViolatedException;
 import exception.DomainException;
@@ -15,6 +17,8 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+
 @Component
 @RequiredArgsConstructor
 public class Handler {
@@ -23,7 +27,6 @@ public class Handler {
 
     @PreAuthorize("hasAuthority('CLIENT')")
     public Mono<ServerResponse> listenSaveApplication(ServerRequest serverRequest) {
-        System.out.println("hola");
         return serverRequest.bodyToMono(CreateApplicationDTO.class)
                 .map(applicationApiMapper::toDomain)
                 .flatMap(applicationUseCase::save)
@@ -33,5 +36,25 @@ public class Handler {
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(res))
                 .onErrorResume(ex -> Mono.error(ex instanceof DomainException ? ex : new InternalException(ex, null)));
+    }
+
+    @PreAuthorize("hasAuthority('ADVISOR')")
+    public Mono<ServerResponse> listenGetAllApplication(ServerRequest serverRequest) {
+        ApplicationSearchFilters filters = new ApplicationSearchFilters(
+                serverRequest.queryParam("firstName").filter(s -> !s.isBlank()).orElse(null),
+                serverRequest.queryParam("lastName").filter(s -> !s.isBlank()).orElse(null),
+                serverRequest.queryParam("email").filter(s -> !s.isBlank()).orElse(null),
+                serverRequest.queryParam("amount").filter(s -> !s.isBlank()).map(BigDecimal::new).orElse(null),
+                serverRequest.queryParam("duration").filter(s -> !s.isBlank()).map(Integer::valueOf).orElse(null),
+                serverRequest.queryParam("loanType").filter(s -> !s.isBlank()).orElse(null),
+                serverRequest.queryParam("interestRate").filter(s -> !s.isBlank()).map(Double::valueOf).orElse(null),
+                serverRequest.queryParam("status").filter(s -> !s.isBlank()).orElse(null),
+                serverRequest.queryParam("minBaseSalary").filter(s -> !s.isBlank()).map(Integer::valueOf).orElse(null),
+                serverRequest.queryParam("maxBaseSalary").filter(s -> !s.isBlank()).map(Integer::valueOf).orElse(null)
+        );
+
+        return ServerResponse.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .body(applicationUseCase.findApplications(filters), ApplicationList.class);
     }
 }

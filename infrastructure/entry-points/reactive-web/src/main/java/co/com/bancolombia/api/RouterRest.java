@@ -23,6 +23,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> routerFunction(GlobalErrorHandler globalErrorHandler) {
         var routes = route()
                 .POST(loanPath.getLoans(), req -> true, applicationHandler::listenSaveApplication, applicationDocs.save())
+                .GET(loanPath.getLoans(), applicationHandler::listenGetAllApplication, applicationDocs.save())
                 .build();
 
         return routes.filter(globalErrorHandler);

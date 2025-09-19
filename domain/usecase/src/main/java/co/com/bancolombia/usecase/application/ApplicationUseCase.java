@@ -1,22 +1,25 @@
 package co.com.bancolombia.usecase.application;
 
 import co.com.bancolombia.model.application.Application;
+import co.com.bancolombia.model.application.ApplicationList;
+import co.com.bancolombia.model.application.ApplicationSearchFilters;
 import co.com.bancolombia.model.application.ApplicationView;
 import co.com.bancolombia.model.application.gateways.ApplicationRepository;
-import co.com.bancolombia.model.applicationstatus.ApplicationStatus;
 import co.com.bancolombia.model.applicationstatus.gateways.ApplicationStatusRepository;
 import co.com.bancolombia.model.auth.gateway.AuthGateway;
 import co.com.bancolombia.model.identity.Identity;
 import co.com.bancolombia.model.identity.gateways.IdentityRepository;
 import co.com.bancolombia.model.loantype.gateways.LoanTypeRepository;
+import co.com.bancolombia.model.user.UserSearchFilters;
+import co.com.bancolombia.model.user.UsersFiltered;
 import co.com.bancolombia.usecase.application.validation.PendingApplicationValidator;
 import exception.BusinessRuleViolatedException;
 import gateways.CustomLogger;
 import gateways.TransactionalGateway;
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import utils.RoleTypes;
-import utils.StatusType;
 
 import java.util.UUID;
 
@@ -117,5 +120,76 @@ public class ApplicationUseCase implements IApplicationUseCase {
 
     private Mono<Void> requireTrue(Mono<Boolean> mono, String message) {
         return mono.flatMap(ok -> ok ?   Mono.empty() : Mono.error(new BusinessRuleViolatedException(message)));
+    }
+
+    private boolean hasApplicationFilters(ApplicationSearchFilters applicationSearchFilters) {
+        return applicationSearchFilters.amount() != null
+                || (applicationSearchFilters.email() != null && !applicationSearchFilters.email().isEmpty())
+                || (applicationSearchFilters.duration() != null && applicationSearchFilters.duration() > 0)
+                || (applicationSearchFilters.loanType() != null && !applicationSearchFilters.loanType().isEmpty())
+                || applicationSearchFilters.interestRate() != null
+                || (applicationSearchFilters.status() != null && !applicationSearchFilters.status().isEmpty());
+    }
+
+    private boolean hasUserFilters(UserSearchFilters userSearchFilters) {
+        return (userSearchFilters.firstName() != null && !userSearchFilters.firstName().isEmpty())
+        || (userSearchFilters.lastName() != null && !userSearchFilters.lastName().isEmpty())
+        || (userSearchFilters.email() != null && !userSearchFilters.email().isEmpty())
+        || (userSearchFilters.minBaseSalary() != null && userSearchFilters.minBaseSalary() > 0)
+        || (userSearchFilters.maxBaseSalary() != null && userSearchFilters.maxBaseSalary() > 0);
+    }
+
+    public Flux<ApplicationList> findApplications(ApplicationSearchFilters applicationSearchFilters) {
+        UserSearchFilters userSearchFilters = new UserSearchFilters(
+                applicationSearchFilters.firstName(),
+                applicationSearchFilters.lastName(),
+                applicationSearchFilters.email(),
+                null,null,null,null,null,
+                applicationSearchFilters.minBaseSalary(),
+                applicationSearchFilters.maxBaseSalary()
+        );
+
+        if (!hasUserFilters(userSearchFilters)) {
+            return hasApplicationFilters(applicationSearchFilters)
+                    ? applicationRepository.search(applicationSearchFilters)
+                    : applicationRepository.getAllApplicationList();
+        }
+
+        return authGateway.search(userSearchFilters)
+                .collectMap(UsersFiltered::email, u -> u)
+                .flatMapMany(users -> {
+                    if (users.isEmpty()) return Flux.empty();
+
+                    return Flux.fromIterable(users.keySet())
+                            .flatMap(email ->
+                                    applicationRepository.search(new ApplicationSearchFilters(
+                                            applicationSearchFilters.firstName(),
+                                            applicationSearchFilters.lastName(),
+                                            email,
+                                            applicationSearchFilters.amount(),
+                                            applicationSearchFilters.duration(),
+                                            applicationSearchFilters.loanType(),
+                                            applicationSearchFilters.interestRate(),
+                                            applicationSearchFilters.status(),
+                                            applicationSearchFilters.minBaseSalary(),
+                                            applicationSearchFilters.maxBaseSalary()
+                                    ))
+                            ).map(app -> {
+                                var u = users.get(app.getEmail());
+                                var fullName = u.firstName() + " " + u.lastName();
+                                var baseSalary = u.baseSalary();
+                                return new ApplicationList(
+                                    app.getAmount(),
+                                    app.getDuration(),
+                                    app.getEmail(),
+                                    fullName,
+                                    app.getLoanType(),
+                                    app.getInteresRate(),
+                                    app.getStatus(),
+                                    baseSalary,
+                                    app.getTotalApprovedMonthlyDebt()
+                                );
+                            });
+                });
     }
 }
