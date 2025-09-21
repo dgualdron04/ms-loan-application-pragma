@@ -33,7 +33,7 @@ public class ApplicationsWithStatusAndLoanTypesView {
     private Double interesRate;
 
     @Column("statustype")
-    private String statustype;
+    private String statusType;
 
     @Column("totalapprovedmonthlydebt")
     private BigDecimal totalApprovedMonthlyDebt;

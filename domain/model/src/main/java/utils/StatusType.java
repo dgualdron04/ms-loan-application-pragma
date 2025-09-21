@@ -11,7 +11,8 @@ import java.util.Arrays;
 public enum StatusType {
     APPROVE("Aprobado"),
     NOT_APPROVE("No aprobado"),
-    PENDING_REVIEW("Pendiente de revisión");
+    PENDING_REVIEW("Pendiente de revisión"),
+    MANUAL_REVIEW("Revisión Manual");
 
     private final String name;
 

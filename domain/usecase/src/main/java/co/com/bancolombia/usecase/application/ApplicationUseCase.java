@@ -20,7 +20,12 @@ import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import utils.RoleTypes;
+import utils.pagination.PageOptions;
+import utils.pagination.PageResult;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -140,14 +145,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
     }
 
     public Flux<ApplicationList> findApplications(ApplicationSearchFilters applicationSearchFilters) {
-        UserSearchFilters userSearchFilters = new UserSearchFilters(
-                applicationSearchFilters.firstName(),
-                applicationSearchFilters.lastName(),
-                applicationSearchFilters.email(),
-                null,null,null,null,null,
-                applicationSearchFilters.minBaseSalary(),
-                applicationSearchFilters.maxBaseSalary()
-        );
+        UserSearchFilters userSearchFilters = createUserSearchFilters(applicationSearchFilters);
 
         if (!hasUserFilters(userSearchFilters)) {
             return hasApplicationFilters(applicationSearchFilters)
@@ -175,9 +173,9 @@ public class ApplicationUseCase implements IApplicationUseCase {
                                             applicationSearchFilters.maxBaseSalary()
                                     ))
                             ).map(app -> {
-                                var u = users.get(app.getEmail());
-                                var fullName = u.firstName() + " " + u.lastName();
-                                var baseSalary = u.baseSalary();
+                                UsersFiltered u = users.get(app.getEmail());
+                                String fullName = u.firstName() + " " + u.lastName();
+                                Integer baseSalary = u.baseSalary();
                                 return new ApplicationList(
                                     app.getAmount(),
                                     app.getDuration(),
@@ -191,5 +189,101 @@ public class ApplicationUseCase implements IApplicationUseCase {
                                 );
                             });
                 });
+    }
+
+    public Mono<PageResult<ApplicationList>> findApplicationsPaged(ApplicationSearchFilters applicationSearchFilters, PageOptions pageOptions) {
+
+        UserSearchFilters userSearchFilters = createUserSearchFilters(applicationSearchFilters);
+
+        if (!hasUserFilters(userSearchFilters)) {
+            Mono<PageResult<ApplicationList>> rawPageMono = hasApplicationFilters(applicationSearchFilters)
+                    ? applicationRepository.searchPaged(applicationSearchFilters, pageOptions, null)
+                    : applicationRepository.getAllApplicationListPaged(pageOptions);
+
+            return rawPageMono.flatMap(page -> {
+                List<String> emailsOnPage = page.items().stream()
+                        .map(ApplicationList::getEmail)
+                        .filter(e -> e != null && !e.isBlank())
+                        .distinct()
+                        .toList();
+
+                if (emailsOnPage.isEmpty()) return Mono.empty();
+
+                return Flux.fromIterable(emailsOnPage)
+                        .flatMap(email -> {
+                                    UserSearchFilters onlyEmail = new UserSearchFilters(
+                                            null, null, email, null, null, null, null, null, null, null
+                                    );
+                                    return authGateway.search(onlyEmail)
+                                            .next()
+                                            .map(user -> Map.entry(email, user))
+                                            .defaultIfEmpty(Map.entry(email, null));
+                        })
+                        .collectMap(Map.Entry::getKey, Map.Entry::getValue)
+                        .map(usersByEmail -> {
+                            List<ApplicationList> applicationLists = page.items().stream()
+                                    .map(app -> {
+                                        UsersFiltered user = usersByEmail.get(app.getEmail());
+                                        String fullName =  (user == null) ? null : user.firstName() + " " + user.lastName();
+                                        Integer baseSalary = (user == null) ? null : user.baseSalary();
+
+                                        return new ApplicationList(
+                                                app.getAmount(),
+                                                app.getDuration(),
+                                                app.getEmail(),
+                                                fullName,
+                                                app.getLoanType(),
+                                                app.getInteresRate(),
+                                                app.getStatus(),
+                                                baseSalary,
+                                                app.getTotalApprovedMonthlyDebt()
+                                        );
+                                    })
+                                    .toList();
+                            return new PageResult<>(applicationLists, page.total(), page.page(), page.size(), page.hasNext());
+                        });
+            });
+
+        }
+
+        return authGateway.search(userSearchFilters)
+                .collectMap(UsersFiltered::email, userEmail -> userEmail)
+                .flatMap(usersByEmail -> {
+                    if (usersByEmail.isEmpty()) return Mono.just(new PageResult<>(List.of(), 0, pageOptions.page(), pageOptions.size(), false));
+                    return applicationRepository.searchPaged(applicationSearchFilters, pageOptions,usersByEmail.keySet())
+                            .map(page -> {
+                                List<ApplicationList> applicationLists = page.items().stream()
+                                        .map(app -> {
+                                            UsersFiltered user = usersByEmail.get(app.getEmail());
+                                            String fullName =  (user == null) ? null : user.firstName() + " " + user.lastName();
+                                            Integer baseSalary = (user == null) ? null : user.baseSalary();
+
+                                            return new ApplicationList(
+                                                    app.getAmount(),
+                                                    app.getDuration(),
+                                                    app.getEmail(),
+                                                    fullName,
+                                                    app.getLoanType(),
+                                                    app.getInteresRate(),
+                                                    app.getStatus(),
+                                                    baseSalary,
+                                                    app.getTotalApprovedMonthlyDebt()
+                                            );
+                                        })
+                                        .toList();
+                                return new PageResult<>(applicationLists, page.total(), page.page(), page.size(), page.hasNext());
+                            });
+                });
+    }
+
+    private UserSearchFilters createUserSearchFilters(ApplicationSearchFilters applicationSearchFilters) {
+        return new UserSearchFilters(
+                applicationSearchFilters.firstName(),
+                applicationSearchFilters.lastName(),
+                applicationSearchFilters.email(),
+                null,null,null,null,null,
+                applicationSearchFilters.minBaseSalary(),
+                applicationSearchFilters.maxBaseSalary()
+        );
     }
 }

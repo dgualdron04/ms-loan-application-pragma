@@ -6,8 +6,11 @@ import co.com.bancolombia.model.application.ApplicationSearchFilters;
 import co.com.bancolombia.model.application.ApplicationView;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import utils.pagination.PageOptions;
+import utils.pagination.PageResult;
 
 public interface IApplicationUseCase {
     Mono<ApplicationView> save(ApplicationView application);
     Flux<ApplicationList> findApplications(ApplicationSearchFilters applicationSearchFilters);
+    Mono<PageResult<ApplicationList>> findApplicationsPaged(ApplicationSearchFilters applicationSearchFilters, PageOptions pageOptions);
 }

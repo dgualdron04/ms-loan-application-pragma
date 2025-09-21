@@ -9,6 +9,9 @@ import co.com.bancolombia.r2dbc.entity.ApplicationEntity;
 import co.com.bancolombia.r2dbc.entity.ApplicationsWithStatusAndLoanTypesView;
 import co.com.bancolombia.r2dbc.helper.ReactiveAdapterOperations;
 import org.reactivecommons.utils.ObjectMapper;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.core.query.Query;
@@ -17,11 +20,13 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import utils.LoanType;
+import utils.RoleTypes;
 import utils.StatusType;
+import utils.pagination.PageOptions;
+import utils.pagination.PageResult;
+import utils.pagination.SortOrder;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Repository
 public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperations<
@@ -50,7 +55,7 @@ public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperati
     }
 
     public Flux<ApplicationList> search(ApplicationSearchFilters applicationSearchFilters) {
-        Criteria c = buildCriteria(applicationSearchFilters);
+        Criteria c = buildCriteria(applicationSearchFilters, null);
         Query q = Query.query(c);
         return template.select(q, ApplicationsWithStatusAndLoanTypesView.class)
                 .map(a -> new ApplicationList(
@@ -60,7 +65,7 @@ public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperati
                         null,
                         LoanType.fromName(a.getLoanType()),
                         a.getInteresRate(),
-                        StatusType.fromName(a.getStatustype()),
+                        StatusType.fromName(a.getStatusType()),
                         null,
                         a.getTotalApprovedMonthlyDebt()
                 ));
@@ -75,21 +80,98 @@ public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperati
                         null,
                         LoanType.fromName(a.getLoanType()),
                         a.getInteresRate(),
-                        StatusType.fromName(a.getStatustype()),
+                        StatusType.fromName(a.getStatusType()),
                         null,
                         a.getTotalApprovedMonthlyDebt()
                 ));
     }
 
-    private Criteria buildCriteria(ApplicationSearchFilters u) {
+    @Override
+    public Mono<PageResult<ApplicationList>> searchPaged(ApplicationSearchFilters applicationSearchFilters, PageOptions pageOptions, Collection<String> allowedEmails) {
+        Criteria criteria = buildCriteria(applicationSearchFilters, allowedEmails);
+
+        return pageQuery(criteria, pageOptions);
+    }
+
+    @Override
+    public Mono<PageResult<ApplicationList>> getAllApplicationListPaged(PageOptions pageOptions) {
+        return pageQuery(Criteria.empty(), pageOptions);
+    }
+
+    private Mono<PageResult<ApplicationList>> pageQuery(Criteria criteria, PageOptions pageOptions) {
+
+        Sort sort = toSort(pageOptions.sort());
+        Pageable pageable =
+                PageRequest.of(
+                        Math.max(pageOptions.page(), 0),
+                        Math.max(pageOptions.size(), 1),
+                        sort
+                );
+
+        Query base = Query.query(criteria);
+        Query basePageable = base.with(pageable);
+
+        Mono<Long> totalMono = template.count(base, ApplicationsWithStatusAndLoanTypesView.class);
+
+        Mono<List<ApplicationList>> itemsMono = template.select(basePageable, ApplicationsWithStatusAndLoanTypesView.class)
+                .map(u -> new ApplicationList(
+                        u.getAmount(),
+                        u.getDuration(),
+                        u.getEmail(),
+                        null,
+                        LoanType.fromName(u.getLoanType()),
+                        u.getInteresRate(),
+                        StatusType.fromName(u.getStatusType()),
+                        null,
+                        u.getTotalApprovedMonthlyDebt()
+                ))
+                .collectList();
+
+        return Mono.zip(totalMono, itemsMono)
+                .map(t -> {
+                    long total = t.getT1();
+                    List<ApplicationList> items = t.getT2();
+                    boolean hasNext = ((long) (pageOptions.page() + 1) * pageOptions.size()) < total;
+                    return new PageResult<>(items, total, pageOptions.page(), pageOptions.size(), hasNext);
+                });
+    }
+
+    private Sort toSort(List<SortOrder> sortOrders) {
+        Map<String, String> mapColumns = Map.of(
+                "email", "email",
+                "duration", "duration",
+                "amount", "amount",
+                "loanType", "loantype",
+                "interesRate", "interesrate",
+                "statusType", "statustype"
+        );
+
+        ArrayList<Sort.Order> list = new ArrayList<Sort.Order>();
+        for (SortOrder sortOrder : sortOrders) {
+            String col = mapColumns.get(sortOrder.field());
+            if (col != null) {
+                list.add(sortOrder.asc()
+                        ? Sort.Order.asc(col)
+                        : Sort.Order.desc(col));
+            }
+        }
+
+        return list.isEmpty()
+                ? Sort.by("email")
+                : Sort.by(list);
+    }
+
+    private Criteria buildCriteria(ApplicationSearchFilters u, Collection<String> allowedEmails) {
         List<Criteria> list = new ArrayList<>();
-        if (u.email() != null && !u.email().isEmpty())
+        if (allowedEmails != null && !allowedEmails.isEmpty())
+            list.add(Criteria.where("email").in(allowedEmails));
+        else if (u.email() != null && !u.email().isBlank())
             list.add(Criteria.where("email").like("%" + u.email().trim() + "%").ignoreCase(true));
         if (u.duration() != null && u.duration() > 0)
             list.add(Criteria.where("duration").is(u.duration()));
         if (u.amount() != null)
                 list.add(Criteria.where("amount").is(u.amount()));
-        if (u.loanType() != null && !u.loanType().isEmpty())
+        if (u.loanType() != null && !u.loanType().isBlank())
             list.add(Criteria.where("loantype").is(u.loanType()));
         if (u.interestRate() != null)
             list.add(Criteria.where("interesrate").is(u.interestRate()));
