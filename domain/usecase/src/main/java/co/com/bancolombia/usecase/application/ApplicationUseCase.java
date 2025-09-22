@@ -23,10 +23,7 @@ import utils.RoleTypes;
 import utils.pagination.PageOptions;
 import utils.pagination.PageResult;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @RequiredArgsConstructor
 public class ApplicationUseCase implements IApplicationUseCase {
@@ -207,7 +204,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
                         .distinct()
                         .toList();
 
-                if (emailsOnPage.isEmpty()) return Mono.empty();
+                if (emailsOnPage.isEmpty()) return Mono.just(page);
 
                 return Flux.fromIterable(emailsOnPage)
                         .flatMap(email -> {
@@ -216,8 +213,9 @@ public class ApplicationUseCase implements IApplicationUseCase {
                                     );
                                     return authGateway.search(onlyEmail)
                                             .next()
-                                            .map(user -> Map.entry(email, user))
-                                            .defaultIfEmpty(Map.entry(email, null));
+                                            .map(user -> new AbstractMap.SimpleEntry<>(email, user))
+                                            .defaultIfEmpty(new AbstractMap.SimpleEntry<>(email, null))
+                                            .onErrorReturn(new AbstractMap.SimpleEntry<>(email, null));
                         })
                         .collectMap(Map.Entry::getKey, Map.Entry::getValue)
                         .map(usersByEmail -> {
