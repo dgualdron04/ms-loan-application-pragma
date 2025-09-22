@@ -1,5 +1,6 @@
 package co.com.bancolombia.api.security.config;
 
+import co.com.bancolombia.api.config.LoanPath;
 import co.com.bancolombia.api.security.exception.JsonSecurityErrorHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -33,12 +34,17 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(
             ServerHttpSecurity http,
             Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthConverter,
-            JsonSecurityErrorHandler errorHandler) {
+            JsonSecurityErrorHandler errorHandler, LoanPath loanPath) {
 
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(ex -> ex
-                        .pathMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
+                        .pathMatchers(loanPath.getActuator(),
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs/swagger-config",
+                                "/webjars/**")
                         .permitAll()
                         .anyExchange().authenticated()
                 )

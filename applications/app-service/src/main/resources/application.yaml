@@ -1,14 +1,14 @@
 server:
-  port: 8081
+  port: ${SERVER_PORT:8081}
 spring:
   application:
-    name: "ms-loan-application"
+    name: ${SPRING_APPLICATION_NAME:ms-loan-application}
   devtools:
     add-properties: false
   h2:
     console:
-      enabled: true
-      path: "/h2"
+      enabled: false
+
 logging:
   level:
     root: "INFO"
@@ -16,16 +16,18 @@ logging:
     org.springframework.r2dbc: "WARN"
     io.r2dbc.postgresql.QUERY: "INFO"
     io.r2dbc.postgresql.PARAM: "WARN"
+
 adapters:
   r2dbc:
-    host: "localhost"
-    port: 5432
-    database: "crediya_loan_db"
-    schema: "public"
-    username: "crediya"
-    password: "crediya2025"
+    host: ${ADAPTERS_R2DBC_HOST:localhost}
+    port: ${ADAPTERS_R2DBC_PORT:5432}
+    database: ${ADAPTERS_R2DBC_DATABASE:crediya_loan_db}
+    schema: ${ADAPTERS_R2DBC_SCHEMA:public}
+    username: ${ADAPTERS_R2DBC_USERNAME:crediya}
+    password: ${ADAPTERS_R2DBC_PASSWORD:crediya2025}
   profiles:
-    include: null
+    include: ${ADAPTERS_PROFILES_INCLUDE:}
+
 management:
   endpoints:
     web:
@@ -38,15 +40,19 @@ management:
   health:
     circuitbreakers:
       enabled: true
+
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:8080"
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:"http://localhost:4200,http://localhost:8080"}
 routes:
   paths:
     loans: "/api/v1/solicitud"
+    actuator: "/actuator/health"
+
 adapter:
   restconsumer:
-    timeout: 3000
-    url: "http://localhost:8080"
+    timeout: ${ADAPTER_RESTCONSUMER_TIMEOUT:3000}
+    url: ${ADAPTER_RESTCONSUMER_URL:"http://ms-authentication:8080"}
+
 resilience4j:
   circuitbreaker:
     instances:
@@ -68,7 +74,8 @@ resilience4j:
         slidingWindowSize: 10
         minimumNumberOfCalls: 10
         waitDurationInOpenState: "10s"
+
 jwt:
-  secret: "GKU2sCyjHN2D4KXdLKsxRn3UDKI1TjTdP3pxzMzfIE8="
-  expiration: 3600
+  secret: ${JWT_SECRET:GKU2sCyjHN2D4KXdLKsxRn3UDKI1TjTdP3pxzMzfIE8=}
+  expiration: ${JWT_EXPIRATION:3600}
   jws-algorithms: HS256

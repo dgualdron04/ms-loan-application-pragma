@@ -11,4 +11,5 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "routes.paths")
 public class LoanPath {
     private String loans;
+    private String actuator;
 }
