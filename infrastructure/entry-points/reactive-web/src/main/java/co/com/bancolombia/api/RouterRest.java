@@ -24,6 +24,7 @@ public class RouterRest {
         var routes = route()
                 .POST(loanPath.getLoans(), req -> true, applicationHandler::listenSaveApplication, applicationDocs.save())
                 .GET(loanPath.getLoans(), applicationHandler::listenGetAllApplication, applicationDocs.save())
+                .PATCH(loanPath.getLoans(), applicationHandler::updateStatusApplication, applicationDocs.save())
                 .build();
 
         return routes.filter(globalErrorHandler);

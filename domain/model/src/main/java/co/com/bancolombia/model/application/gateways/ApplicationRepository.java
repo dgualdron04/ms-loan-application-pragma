@@ -18,5 +18,5 @@ public interface ApplicationRepository {
     Flux<ApplicationList> getAllApplicationList();
     Mono<PageResult<ApplicationList>> searchPaged(ApplicationSearchFilters userSearchFilters, PageOptions pageOptions, Collection<String> allowedEmails);
     Mono<PageResult<ApplicationList>> getAllApplicationListPaged(PageOptions pageOptions);
-
+    Mono<Application> updateStatus(UUID id, UUID newStatusId);
 }

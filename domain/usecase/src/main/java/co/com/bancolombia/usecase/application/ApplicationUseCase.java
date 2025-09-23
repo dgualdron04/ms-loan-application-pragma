@@ -1,15 +1,14 @@
 package co.com.bancolombia.usecase.application;
 
-import co.com.bancolombia.model.application.Application;
-import co.com.bancolombia.model.application.ApplicationList;
-import co.com.bancolombia.model.application.ApplicationSearchFilters;
-import co.com.bancolombia.model.application.ApplicationView;
+import co.com.bancolombia.model.application.*;
 import co.com.bancolombia.model.application.gateways.ApplicationRepository;
 import co.com.bancolombia.model.applicationstatus.gateways.ApplicationStatusRepository;
 import co.com.bancolombia.model.auth.gateway.AuthGateway;
 import co.com.bancolombia.model.identity.Identity;
 import co.com.bancolombia.model.identity.gateways.IdentityRepository;
 import co.com.bancolombia.model.loantype.gateways.LoanTypeRepository;
+import co.com.bancolombia.model.notification.ApplicationStatusNotification;
+import co.com.bancolombia.model.notification.gateways.NotificationRepository;
 import co.com.bancolombia.model.user.UserSearchFilters;
 import co.com.bancolombia.model.user.UsersFiltered;
 import co.com.bancolombia.usecase.application.validation.PendingApplicationValidator;
@@ -20,9 +19,11 @@ import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import utils.RoleTypes;
+import utils.StatusType;
 import utils.pagination.PageOptions;
 import utils.pagination.PageResult;
 
+import java.time.Instant;
 import java.util.*;
 
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class ApplicationUseCase implements IApplicationUseCase {
     private final AuthGateway authGateway;
     private final CustomLogger logger;
     private final IdentityRepository identityRepository;
+    private final NotificationRepository notificationRepository;
 
     public Mono<ApplicationView> save(ApplicationView application) {
 
@@ -118,6 +120,46 @@ public class ApplicationUseCase implements IApplicationUseCase {
         .doOnSuccess(s -> {
             logger.info("SaveApplication.ok email={} id={}", application.getEmail(), application.getIdNumber());
         });
+    }
+
+    public Mono<UpdateStatusResult> updateStatusApplication(UpdateStatusApplication updateStatusApplication) {
+
+        logger.info("UpdateStatusApplication started applicationId={} newStatus={}", updateStatusApplication.applicationId(), updateStatusApplication.statusType());
+
+        UUID applicationId = UUID.fromString(updateStatusApplication.applicationId());
+        StatusType statusType = StatusType.fromName(updateStatusApplication.statusType());
+
+        if (!(statusType == StatusType.APPROVE || statusType == StatusType.NOT_APPROVE)) {
+            return Mono.error(new BusinessRuleViolatedException(
+                    "State not allowed. Use 'Aprobado' or 'No aprobado'."
+            ));
+        }
+
+        return applicationStatusRepository.findIdByName(statusType)
+                .switchIfEmpty(Mono.error(new BusinessRuleViolatedException("The status " + updateStatusApplication.statusType() + " does not exist.")))
+                .flatMap(statusId -> applicationRepository.updateStatus(applicationId, statusId))
+                .flatMap(appSaved -> {
+                    String email = appSaved.getEmail();
+                    ApplicationStatusNotification appNotification = ApplicationStatusNotification.builder()
+                            .applicationId(applicationId.toString())
+                            .email(email)
+                            .status(updateStatusApplication.statusType())
+                            .timestamp(Instant.now().toString())
+                            .build();
+
+                    return notificationRepository.publish(appNotification)
+                            .doOnSuccess(v -> logger.info("Notification published applicationId={} email={} status={}", applicationId, email, statusType))
+                            .thenReturn(new UpdateStatusResult(
+                                    applicationId,
+                                    statusType,
+                                    email
+                            ));
+                })
+                .doOnSubscribe(s -> logger.debug("Processing status change applicationId={} status={}",
+                        applicationId, statusType))
+                .doOnSuccess(res -> logger.info("UpdateStatusApplication success applicationId={} status={} email={}", res.id(), res.statusType(), res.email()))
+                .doOnError(e -> logger.error("UpdateStatusApplication failed applicationId={} status={} error={}",
+                        applicationId, statusType, e.toString()));
     }
 
     private Mono<Void> requireTrue(Mono<Boolean> mono, String message) {

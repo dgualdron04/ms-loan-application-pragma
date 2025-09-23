@@ -8,6 +8,7 @@ import co.com.bancolombia.r2dbc.application.view.ApplicationViewReactiveReposito
 import co.com.bancolombia.r2dbc.entity.ApplicationEntity;
 import co.com.bancolombia.r2dbc.entity.ApplicationsWithStatusAndLoanTypesView;
 import co.com.bancolombia.r2dbc.helper.ReactiveAdapterOperations;
+import exception.BusinessRuleViolatedException;
 import org.reactivecommons.utils.ObjectMapper;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,12 +16,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.core.query.Query;
-import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import utils.LoanType;
-import utils.RoleTypes;
 import utils.StatusType;
 import utils.pagination.PageOptions;
 import utils.pagination.PageResult;
@@ -30,8 +29,8 @@ import java.util.*;
 
 @Repository
 public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperations<
-    Application/* change for domain model */,
-    ApplicationEntity/* change for adapter model */,
+    Application,
+    ApplicationEntity,
     UUID,
     ApplicationReactiveRepository
 > implements ApplicationRepository {
@@ -48,6 +47,31 @@ public class ApplicationReactiveRepositoryAdapter extends ReactiveAdapterOperati
     @Override
     public Mono<Application> save(Application application) {
         return super.save(application);
+    }
+
+    @Override
+    public Mono<Application> findById(UUID id) {
+        return super.findById(id);
+    }
+
+    @Override
+    public Mono<Application> updateStatus(UUID id, UUID newStatusId) {
+        return repository.findById(id)
+                .switchIfEmpty(Mono.error(new BusinessRuleViolatedException("There is no application for that ID.")))
+                .flatMap(app -> {
+                    if (newStatusId.equals(app.getStatusId())) {
+                        return Mono.error(new BusinessRuleViolatedException("The application already has that status."));
+                    }
+                    app.setStatusId(newStatusId);
+                    return repository.save(app);
+                }).map(application -> new Application(
+                        application.getIdNumber(),
+                        application.getEmail(),
+                        application.getAmount(),
+                        application.getDuration(),
+                        application.getStatusId(),
+                        application.getLoanTypeId()
+                ));
     }
 
     public Mono<Boolean> existsByIdNumberAndStatusId(Long idNumber, UUID statusId) {

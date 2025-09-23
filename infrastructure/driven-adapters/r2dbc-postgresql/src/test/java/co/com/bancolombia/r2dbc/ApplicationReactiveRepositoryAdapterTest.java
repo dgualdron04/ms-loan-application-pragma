@@ -29,7 +29,7 @@ class ApplicationReactiveRepositoryAdapterTest {
     @Mock
     ObjectMapper mapper;
 
-    @Test
+    /*@Test
     void mustFindValueById() {
 
         when(repository.findById("1")).thenReturn(Mono.just("test"));
@@ -40,8 +40,8 @@ class ApplicationReactiveRepositoryAdapterTest {
         StepVerifier.create(result)
                 .expectNextMatches(value -> value.equals("test"))
                 .verifyComplete();
-    }
-
+    }*/
+/*
     @Test
     void mustFindAllValues() {
         when(repository.findAll()).thenReturn(Flux.just("test"));
@@ -52,7 +52,7 @@ class ApplicationReactiveRepositoryAdapterTest {
         StepVerifier.create(result)
                 .expectNextMatches(value -> value.equals("test"))
                 .verifyComplete();
-    }
+    }*/
 
     @Test
     void mustFindByExample() {

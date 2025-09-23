@@ -1,6 +1,7 @@
 package co.com.bancolombia.api;
 
 import co.com.bancolombia.api.dto.request.CreateApplicationDTO;
+import co.com.bancolombia.model.application.UpdateStatusApplication;
 import co.com.bancolombia.api.exception.model.InternalException;
 import co.com.bancolombia.api.mapper.ApplicationApiMapper;
 import co.com.bancolombia.model.application.ApplicationList;
@@ -37,6 +38,16 @@ public class Handler {
                 .switchIfEmpty(Mono.error(new BusinessRuleViolatedException("APPLICATION_NOT_SAVED")))
                 .map(applicationApiMapper::toResponse)
                 .flatMap(res -> ServerResponse.status(HttpStatus.CREATED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(res))
+                .onErrorResume(ex -> Mono.error(ex instanceof DomainException ? ex : new InternalException(ex, null)));
+    }
+
+    @PreAuthorize("hasAuthority('ADVISOR')")
+    public Mono<ServerResponse> updateStatusApplication(ServerRequest serverRequest) {
+        return serverRequest.bodyToMono(UpdateStatusApplication.class)
+                .flatMap(applicationUseCase::updateStatusApplication)
+                .flatMap(res -> ServerResponse.status(HttpStatus.ACCEPTED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(res))
                 .onErrorResume(ex -> Mono.error(ex instanceof DomainException ? ex : new InternalException(ex, null)));

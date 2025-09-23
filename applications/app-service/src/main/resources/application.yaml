@@ -20,7 +20,7 @@ logging:
 adapters:
   r2dbc:
     host: ${ADAPTERS_R2DBC_HOST:localhost}
-    port: ${ADAPTERS_R2DBC_PORT:5432}
+    port: ${ADAPTERS_R2DBC_PORT:5434}
     database: ${ADAPTERS_R2DBC_DATABASE:crediya_loan_db}
     schema: ${ADAPTERS_R2DBC_SCHEMA:public}
     username: ${ADAPTERS_R2DBC_USERNAME:crediya}
@@ -48,10 +48,16 @@ routes:
     loans: "/api/v1/solicitud"
     actuator: "/actuator/health"
 
+aws:
+  region: ${AWS_REGION:us-east-2}
+
 adapter:
+  sqs:
+    queue-url: ${AWS_QUEUE_URL:"https://sqs.us-east-2.amazonaws.com/794075227206/loan-application-status-dev"}
+
   restconsumer:
     timeout: ${ADAPTER_RESTCONSUMER_TIMEOUT:3000}
-    url: ${ADAPTER_RESTCONSUMER_URL:"http://ms-authentication:8080"}
+    url: ${ADAPTER_RESTCONSUMER_URL:http://localhost:8080}
 
 resilience4j:
   circuitbreaker:

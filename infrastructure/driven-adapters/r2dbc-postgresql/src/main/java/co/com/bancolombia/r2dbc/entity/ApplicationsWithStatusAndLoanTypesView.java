@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table("applications_with_status_and_loan_types") // nombre EXACTO de tu vista
+@Table("applications_with_status_and_loan_types")
 public class ApplicationsWithStatusAndLoanTypesView {
 
     @Column("idnumber")
